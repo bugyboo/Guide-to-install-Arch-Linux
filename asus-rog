@@ -1,0 +1,81 @@
+setfont ter-132b
+cat /sys/firmware/efi/fw_platform_size
+iwctl
+iwctl --passphrase passphrase station wlo1 connect "HotZone 4G"
+timedatectl
+cfdisk /dev/nvme0n1
+mkfs.fat -F32 /dev/nvme0n1p1
+mkswap /dev/nvme0n1p2
+swapon /dev/nvme0n1p2
+mkfs.ext4 /dev/nvme0n1p3
+mount /dev/nvme0n1p3 /mnt
+mkdir /mnt/boot
+mkdir /mnt/home
+mount /dev/nvme0n1p5 /mnt/home
+mount /dev/nvme0n1p1 /mnt/boot
+pacman -Sy
+pacman -S reflector rsync curl
+cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.backup
+sudo reflector --save /etc/pacman.d/mirrorlist --latest 10 --protocol https --sort rate
+---------------------------------------------------------------------------------------
+pacstrap -K /mnt base linux linux-firmware intel-ucode nano vim networkmanager wpa_supplicant
+---------------------------------------------------------------------------------------
+genfstab -U /mnt >> /mnt/etc/fstab
+arch-chroot /mnt
+ln -sf /usr/share/zoneinfo/Region/City /etc/localtime
+hwclock --systohc
+nano /etc/locale.gen
+locale-gen
+echo LANG=en_US.UTF-8 > /etc/locale.conf
+echo Archfish > /etc/hostname
+nano /etc/hosts
+<-
+127.0.0.1     localhost
+::1           localhost
+127.0.1.1     Archfish.localdomain    localhost
+->
+mkinitcpio -P
+passwd
+useradd -m username
+usermod -aG wheel,storage,power username
+visudo
+passwd username
+efivar --list | ls /sys/firmware/efi/efivars
+bootctl install
+nano /boot/loader/loader.conf
+<-
+default   arch.conf
+timeout   4
+console-mode max
+editor    no
+->
+nano /boot/loader/entries/arch.conf
+<-
+title    Arch Linux
+linux    /vmlinuz-linux
+initrd   /initramfs-linux.img
+options  root=UUID=005c7ce2-7988-45b8-ba1a-6c38fd89fb1c rw
+->
+=====================================================================================
+reboot
+=====================================================================================
+pacman -S nvidia nvidia-utils
+pacman -S --needed xorg
+pacman -S --needed gnome gnome-tweaks gnome-nettool gnome-usage xdg-user-dirs-gtk fwupd arc-gtk-theme gdm networkmanager archlinux-wallpaper
+systemctl enable gdm
+systemctl enable NetworkManager
+================================
+$ sudo pacman -Syu xorg xorg-server gnome-shell nautilus gnome-terminal guake gnome-tweak-tool gnome-control-center xdg-user-dirs gdm
+$ sudo systemctl enable gdm
+$ reboot
+------------------------------
+cat /etc/modprobe.d/nvidia-power-management.conf
+options nvidia NVreg_PreserveVideoMemoryAllocations=1 NVreg_TemporaryFilePath=/var/tmp/
+----------------------------
+ln -s /dev/null /etc/udev/rules.d/61-gdm.rules
+----------------------------
+etc/gdm/custom.conf
+GdmXserverTimeout=60
+===============================
+https://bbs.archlinux.org/viewtopic.php?id=291613
+https://wiki.archlinux.org/title/GDM#Wayland_and_the_proprietary_NVIDIA_driver
